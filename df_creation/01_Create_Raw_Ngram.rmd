@@ -1,0 +1,209 @@
+---
+title: "01 - Create Ngrams"
+author: "Luiz Carlos Franze"
+date: "22/05/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+setwd("/home/luiz/Competence/MachineLearning/JohnHopkins_DataScience/git_temp/CourseAssignment10")
+```
+
+
+### Load Libraryes
+
+```{r, message=F, warning=FALSE}
+library(dplyr)
+library(stringr)
+library(stringi)
+library(tibble)
+library(tidytext)
+
+library(gdata)
+library(tm)
+library(ngram)
+
+
+library(tokenizers)
+library(ggplot2)
+
+library(textreg)
+```
+
+### Parameter set
+
+```{r}
+
+bigram_level <- as.integer(readline(prompt="Insert N-Gram Level [1 to 4]: "))
+#bigram_level <- as.integer(bigram_level)
+sample_perc <- as.double(readline(prompt="Insert the % of training data [0.01 to 1]: "))
+sample_frac_from_training <- as.double(readline(prompt="Insert the % of df size from training data [0.01 to 1]: "))
+
+seed_value <- 404
+level <- c(1,2,3,4)
+ngram <- c("unigram","bigram","trigram","quadgram")
+file <- c("unigram.rds","bigram.rds","trigram.rds","quadgram.rds")
+path_ngram <- "data/ngramraw/"
+
+parameters <- data.frame(level, ngram, file, stringsAsFactors = F)
+
+bigram_level <- filter(parameters, level == bigram_level)
+```
+
+
+### Load Data
+
+```{r}
+files = c("final/en_US/en_US.twitter.txt",
+          "final/en_US/en_US.news.txt",
+          "final/en_US/en_US.blogs.txt")
+
+url <- "https://d396qusza40orc.cloudfront.net/dsscapstone/dataset/Coursera-SwiftKey.zip"
+if (!file.exists("Coursera-SwiftKey.zip")){
+    download.file(url,"Coursera-SwiftKey.zip")
+}
+if (!all(c(file.exists("data/en_US.blogs.txt"),
+           file.exists("data/en_US.news.txt"),
+           file.exists("data/en_US.twitter.txt")
+           ))){
+    unzip("Coursera-SwiftKey.zip",files = files,junkpaths = T, exdir = "data")
+}
+
+t_blogs <- readLines("data/en_US.blogs.txt",encoding = "UTF-8", skipNul = TRUE)
+t_news <- readLines("data/en_US.news.txt",encoding = "UTF-8", skipNul = TRUE)
+t_twiter <- readLines("data/en_US.twitter.txt",encoding = "UTF-8", skipNul = TRUE)
+```
+
+
+### Pre Analysis
+
+```{r}
+# Creating function to get the data info:
+get_data_info <- function(data_a, data_b, data_c){
+    name_lines <- c("Blogs", "News", "Twiter")
+    name_columns <- c("Num.Lines", "Num.Words", "Size")
+    h_lines <- c(format(length(data_a), nsmall=0, big.mark=","),
+                 format(length(data_b), nsmall=0,big.mark=","),
+                 format(length(data_c), nsmall=0, big.mark=","))
+    h_size <- c(humanReadable(object.size(data_a)),
+                humanReadable(object.size(data_b)),
+                humanReadable(object.size(data_c)))
+    h_words <- c(format(wordcount(data_a, sep = " ", count.function = sum), nsmall=0, big.mark=","),
+                 format(wordcount(data_b, sep = " ", count.function = sum), nsmall=0, big.mark=","),
+                 format(wordcount(data_c, sep = " ", count.function = sum), nsmall=0, big.mark=","))
+    data_info <- c(h_lines, h_words, h_size)
+    data.frame(matrix(data_info, nrow = 3, ncol = 3, dimnames = list(name_lines, name_columns)))
+}
+```
+
+
+### Training and test data
+
+```{r}
+t_blogs <- tibble(text = t_blogs) %>% mutate(plataform="blogs")
+t_news <- tibble(text = t_news) %>% mutate(plataform="news")
+t_twiter <- tibble(text = t_twiter) %>% mutate(plataform="twiter")
+
+t_blogs <- rownames_to_column(t_blogs, var = "id")
+t_news <- rownames_to_column(t_news, var = "id")
+t_twiter <- rownames_to_column(t_twiter, var = "id")
+
+
+# Creating training and test data
+
+set.seed(seed_value)
+training_blogs <- t_blogs %>% sample_frac(sample_perc)
+test_blogs <- anti_join(t_blogs, training_blogs, by = "id")
+
+set.seed(seed_value)
+training_news <- t_news %>% sample_frac(sample_perc)
+test_news <- anti_join(t_news, training_news, by = "id")
+
+set.seed(seed_value)
+training_twiter <- t_twiter %>% sample_frac(sample_perc)
+test_twiter <- anti_join(t_twiter, training_twiter, by = "id")
+
+training_all_data <- rbind(training_blogs, training_news, training_twiter)
+test_all_data <- rbind(test_blogs, test_news, test_twiter)
+
+training_all_data$plataform <- as.factor(training_all_data$plataform)
+test_all_data$plataform <- as.factor(test_all_data$plataform)
+
+
+
+
+rm(t_blogs, t_news, t_twiter, training_blogs, training_news, training_twiter,
+   test_blogs, test_news, test_twiter)
+```
+
+### Cleanup
+
+
+
+```{r}
+df_cleanup_txt <- function(df){
+    # Cleanup the data
+    removelinks <- function(x) {gsub("?(f|ht)tp(s?)://(.*)[.][a-z]+", "", x)}
+    data_corpus <- Corpus(VectorSource(df$text))
+    data_corpus <- tm_map(data_corpus, PlainTextDocument)
+    data_corpus <- tm_map(data_corpus, tolower)
+    data_corpus <- tm_map(data_corpus, str_squish)
+    data_corpus <- tm_map(data_corpus, removelinks)
+    data_corpus <- tm_map(data_corpus, removePunctuation)
+    #data_corpus <- tm_map(data_corpus, PlainTextDocument)
+    df$text <- data.frame(text = get("content", data_corpus), stringsAsFactors = FALSE)[,1]
+    df
+}
+```
+
+```{r, message=F, warning=F}
+training_all_data <- df_cleanup_txt(training_all_data)
+test_all_data <- df_cleanup_txt(test_all_data)
+saveRDS(test_all_data, "data/TrainTest/TestData.rds")
+saveRDS(training_all_data, "data/TrainTest/TrainingData.rds")
+rm(test_all_data)
+```
+
+
+```{r}
+generate_ngrams <- function(df, ngrams_size = 1){
+        df_ngram <- tokenize_ngrams(as.vector(df$text), n = ngrams_size, n_min = ngrams_size, simplify = T) %>%
+            unlist() %>%
+            as_tibble() %>%
+            count(value, sort = TRUE) 
+}
+```
+
+
+### generating Ngrams
+
+```{r}
+df_ngram <- training_all_data %>% sample_frac(sample_frac_from_training) %>% #Decrease from 0.7 to 0.35 sample
+generate_ngrams(ngrams_size = as.integer(bigram_level[1]))
+size_ngram <- object.size(df_ngram)
+saveRDS(df_ngram, paste(path_ngram,as.character(bigram_level[3]),sep=""))
+rm(df_ngram)
+
+
+```
+
+
+
+
+```{r}
+print("Size Ngram:")
+print(size_ngram, units = "auto")
+```
+
+
+```{r}
+.rs.restartR()
+```
+
+
+
+```{r}
+#execution
+```
+

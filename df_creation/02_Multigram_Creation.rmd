@@ -1,0 +1,311 @@
+---
+title: "Ngrams Prediction"
+author: "Luiz Carlos Franze"
+date: "23/05/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+setwd("/home/luiz/Competence/MachineLearning/JohnHopkins_DataScience/git_temp/CourseAssignment10")
+```
+
+
+
+### Load Libraries
+
+```{r, message=F, warning=F}
+library(dplyr)
+library(tibble)
+library(tidyverse)
+library(stringi)
+library(stringr)
+library(tm)
+```
+
+
+
+```{r}
+ngram_folders <- "data/ngramraw/"
+```
+
+
+
+### Load N-Grams
+
+
+```{r}
+#unigram <- readRDS(file = paste(ngram_folders,"unigram.rds",sep=""))
+#bigram <- readRDS(file = paste(ngram_folders,"bigram.rds",sep=""))
+#trigram <- readRDS(file = paste(ngram_folders,"trigram.rds",sep=""))
+#quadgram <- readRDS(file = paste(ngram_folders,"quadgram.rds",sep=""))
+```
+
+```{r}
+#quadgram$level <- 4
+#trigram$level <- 3
+#bigram$level <- 2
+```
+
+
+```{r}
+prepare_df_pred <- function(df){
+    df <- df %>% 
+        mutate(prediction = stri_extract_last_words(value)) %>%
+        mutate(value = word(value , 1  , -2))
+    df
+}
+
+#quadgram <- prepare_df_pred(quadgram)
+#saveRDS(quadgram, "data/ngram/quadgram.rds")
+
+#trigram <- prepare_df_pred(trigram)
+#saveRDS(trigram, "data/ngram/trigram.rds")
+
+#bigram <- prepare_df_pred(bigram)
+#saveRDS(bigram, "data/ngram/bigramrds")
+
+
+
+```
+
+### A partir daqui é usado somente a predição... a preparacao sao as linhas anteriores, executado e restartando o R a cada DF-Gram
+
+```{r}
+ngram_folders <- "data/ngram/"
+bigram <- readRDS(file = paste(ngram_folders,"bigram.rds",sep=""))
+trigram <- readRDS(file = paste(ngram_folders,"trigram.rds",sep=""))
+quadgram <- readRDS(file = paste(ngram_folders,"quadgram.rds",sep=""))
+```
+
+
+
+```{r}
+multigram <- rbind(quadgram,trigram,bigram)
+multigram <- multigram %>% arrange(desc(level),desc(n))
+```
+
+
+
+```{r}
+predict_ngram <- function(sentence_input, sentence_options){
+    removelinks <- function(x) {gsub("?(f|ht)tp(s?)://(.*)[.][a-z]+", "", x)}
+    sentence_input <- tolower(sentence_input)
+    sentence_input <- str_squish(sentence_input)
+    sentence_input <- removelinks(sentence_input)
+    sentence_input <- removePunctuation(sentence_input)
+    
+    answer <- tibble(value = character(),
+                     n = integer(),
+                     level = double(),
+                     prediction = character())
+    
+    #answer <- multigram %>% filter(sentence_input == value)
+    
+    while(nrow(answer) == 0 && sapply(strsplit(sentence_input, " "), length) > 0){
+        answer <- multigram %>% filter(sentence_input == value) %>% filter(prediction %in% sentence_options)
+        #print(answer)
+        #print(sentence_input)
+        ifelse (sapply(strsplit(sentence_input, " "), length) <= 1, sentence_input <- "", sentence_input <- sub(".+? ", "", sentence_input))
+        #print(head(answer,1))
+    }
+    answer
+    
+}
+```
+
+
+```{r}
+df_sum <- df_sum %>% group_by(value) %>%
+    summarise(total = sum(n))
+```
+
+
+```{r}
+multigram <- multigram %>% left_join(df_sum,by="value") %>% mutate(weight=n/total) %>% select(value,level,weight,prediction)
+saveRDS(multigram, "data/df_prediction.rds")
+```
+
+### A partir daqui é usado somente a predição... a preparacao sao as linhas anteriores, executado e restartando o R a cada DF-Gram
+
+```{r}
+ngram_folders <- "data/ngram/"
+bigram <- readRDS(file = paste(ngram_folders,"bigram.rds",sep=""))
+trigram <- readRDS(file = paste(ngram_folders,"trigram.rds",sep=""))
+quadgram <- readRDS(file = paste(ngram_folders,"quadgram.rds",sep=""))
+```
+
+
+
+```{r}
+multigram <- rbind(quadgram,trigram,bigram)
+multigram <- multigram %>% arrange(desc(level),desc(n))
+```
+
+
+
+```{r}
+saveRDS(multigram, "data/multigram.rds")
+```
+
+
+
+```{r}
+input <- "a case of"
+# 1
+x <- c("soda", "pretzels", "beer", "cheese")
+predict_ngram(input, x)
+```
+
+```{r}
+# 2
+input <- "would mean the"
+x <- c("universe", "best", "most", "world")
+predict_ngram(input, x)
+```
+
+```{r}
+# 3
+input <- " make me the"
+x <- c("saddest", "bluest", "happiest", "smelliest")
+predict_ngram(input, x)
+```
+
+```{r}
+# 4
+input <- "struggling but the"
+x <- c("players", "crowd", "defense", "referees")
+predict_ngram(input, x)
+```
+
+```{r}
+# 5
+input <- "date at the"
+x <- c("beach", "mall", "movies", "grocery")
+predict_ngram(input, x)
+```
+
+```{r}
+#6
+input <- "be on my"
+x <- c("phone", "motorcycle", "horse", "way")
+predict_ngram(input, x)
+```
+
+```{r}
+# 7
+input <- "in quite some"
+x <- c("time", "years", "weeks", "thing")
+predict_ngram(input, x)
+```
+
+```{r}
+# 8
+input <- "with his little"
+x <- c("eyes", "toes", "ears", "fingers")
+predict_ngram(input, x)
+```
+
+```{r}
+# 9
+input <- "faith during the"
+x <- c("sad", "bad", "hard", "worse")
+predict_ngram(input, x)
+```
+
+```{r}
+# 10
+input <- "you must be"
+x <- c("asleep", "insensitive", "insane", "callous")
+predict_ngram(input, x)
+```
+
+
+
+# Quiz 4
+
+```{r}
+# 1
+input <- "live and I'd"
+x <- c("eat", "sleep", "die", "eat")
+predict_ngram(input, x)
+```
+
+
+```{r}
+# 2
+input <- "me about his"
+x <- c("material", "financial", "spiritual", "horticultural")
+predict_ngram(input, x)
+```
+??????
+
+```{r}
+# 3
+input <- "arctic monkeys this"
+x <- c("morning", "month", "decade", "weekend")
+predict_ngram(input, x)
+```
+
+
+```{r}
+# 4
+input <- "helps reduce your"
+x <- c("stress", "happiness", "sleepiness", "hunger")
+predict_ngram(input, x)
+```
+
+
+```{r}
+# 5
+input <- "to take a"
+x <- c("picture", "walk", "look", "minute")
+predict_ngram(input, x)
+```
+
+
+```{r}
+# 6
+input <- "to settle the"
+x <- c("account", "matter", "case", "incident")
+predict_ngram(input, x)
+```
+
+
+```{r}
+# 7
+input <- "groceries in each"
+x <- c("toe", "hand", "arm", "finger")
+predict_ngram(input, x)
+```
+
+
+```{r}
+# 8
+input <- "bottom to the"
+x <- c("side", "center", "middle", "top")
+predict_ngram(input, x)
+```
+
+
+```{r}
+# 9
+input <- " bruises from playing"
+x <- c("weekly", "daily", "inside", "outside")
+predict_ngram(input, x)
+```
+
+
+```{r}
+# 10
+input <- "of Adam Sandler's"
+x <- c("movies", "pictures", "stories", "novels")
+predict_ngram(input, x)
+```
+
+
+
+
+
+
+
