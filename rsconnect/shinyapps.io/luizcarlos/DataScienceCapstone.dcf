@@ -1,0 +1,14 @@
+name: DataScienceCapstone
+title: DataScienceCapstone
+username:
+account: luizcarlos
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 4224002
+bundleId: 4674419
+url: https://luizcarlos.shinyapps.io/DataScienceCapstone/
+when: 1622747116.09595
+lastSyncTime: 1622747116.09598
+asMultiple: FALSE
+asStatic: FALSE
+ignoredFiles: df_creation/01_Create_Raw_Ngram.rmd|df_creation/02_Multigram_Creation.rmd|presentation/DataScienceCapstonePresentation.html|presentation/DataScienceCapstonePresentation.rmd|README.md
